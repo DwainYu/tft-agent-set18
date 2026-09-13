@@ -2,15 +2,18 @@
 name = "tft-agent-set18"
 version = "0.1.0"
 description = "Agent engineering training ground: a hand-written agent runtime, stdlib only."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 
 # No dependencies on purpose. Retries, schema validation, the token estimate and
 # the JSONL trace are the material being studied, not plumbing to outsource.
 dependencies = []
 
-[project.optional-dependencies]
+[dependency-groups]
+# Intentionally empty. If an experiment needs a third-party package, add it
+# there with `uv add --group <group> <pkg>` so the core runtime stays clean.
 dev = []
 
-[tool.setuptools]
-packages = ["agent"]
+[tool.uv]
+# Keep the venv at .venv/ so VSCode picks it up automatically.
+package = false
