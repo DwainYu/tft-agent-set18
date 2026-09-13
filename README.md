@@ -22,37 +22,78 @@ Production work belongs to `tft-agent-set17`. Nothing experimental goes there.
 4. **Mock first, real second.** Every experiment is deterministic by default
    and takes `--real` to hit an actual endpoint.
 
+## Development
+
+This project uses [uv](https://github.com/astral-sh/uv) for environment and
+dependency management.
+
+### Setup
+
+```bash
+uv sync
+```
+
+### Run tests
+
+```bash
+uv run python -m unittest discover -s tests -t .
+```
+
+### Run an experiment
+
+```bash
+uv run python experiments/e02_tool_calling.py
+uv run python experiments/e06_hook.py
+```
+
+With a live model:
+
+```bash
+export MODELSCOPE_API_KEY=***                       # ModelScope SDK token
+uv run python experiments/e02_tool_calling.py --real
+```
+
+Never commit a `.env` — copy `.env.example` and fill it in locally.
+
+### Adding a dependency
+
+If an experiment needs a third-party package, add it to the experiment-specific
+group instead of the core runtime:
+
+```bash
+uv add --group dev <package>       # shared dev tool (e.g. pytest)
+uv add --group <experiment-name> <package>  # experiment-only
+```
+
+The core `agent/` stays stdlib-only.
+
 ## Layout
 
 ```text
 agent/
   messages.py    Message / ToolCall / ToolSpec — the wire format
   provider.py    Provider interface, ScriptedProvider, OpenAI-compatible client
-  tools.py       ToolRegistry, argument validation, a safe calculator
-  loop.py        Agent.run: turn loop, budgets, repeat guard, error handling
-  context.py     token estimate + trim policy
-  trace.py       JSONL run trace and timeline rendering
+  loop.py        The agent loop: turn, guard, budget, trim
+  tools.py       Tool registry, AST-based calculator, note store
+  context.py     Token estimate, context window trim
+  trace.py       JSONL trace writer
 experiments/
-  e01_single_turn.py     one completion, no tools
-  e02_tool_calling.py    one tool round trip
-  e03_agent_loop.py      four turns of state-carrying loop
-  e04_failure_modes.py   six ways a run ends badly
-  e05_context_trim.py    what the model actually receives when history grows
-tests/                   28 unittest cases, stdlib only
-docs/architecture.md     why the layers are split this way
+  _common.py     Shared helpers for all scripts
+  e01_single_turn.py
+  e02_tool_calling.py
+  e03_agent_loop.py
+  e04_failure_modes.py
+  e05_context_trim.py
+  e06_hook.py    Hook pattern stub
+tests/
+pyproject.toml   No dependencies by design
+uv.lock          Lockfile — commit this too
+.gitignore
+.env.example
 ```
 
-## Quickstart
-
-```bash
-python3 --version          # 3.10+
-python3 experiments/e03_agent_loop.py
-python3 experiments/e04_failure_modes.py
-python3 -m unittest discover -s tests -t .
-```
-
-No install step, no virtualenv required: `experiments/*` put the repo root on
-`sys.path`, so the code runs straight from a checkout.
+All paths are relative to the repo root. `sys.path` is managed so the code
+runs straight from a checkout.
 
 ### Against a real model
 
@@ -60,11 +101,12 @@ No install step, no virtualenv required: `experiments/*` put the repo root on
 export MODELSCOPE_API_KEY=***                       # ModelScope SDK token
 export MODELSCOPE_BASE_URL=https://api-inference.modelscope.cn/v1   # default
 export AGENT_MODEL=Qwen/Qwen3.8-Flash-Next                          # default
-python3 experiments/e02_tool_calling.py --real
+uv run python experiments/e02_tool_calling.py --real
 ```
 
-Get the token at `https://modelscope.cn/my/myaccesstoken`. Any model the endpoint
-serves works as long as it takes OpenAI-style `tools`; `Org/Model` is the id form.
+Get the token at `https://modelscope.cn/my/myaccesstoken`. Any model the
+endpoint serves works as long as it takes OpenAI-style `tools`; `Org/Model` is
+the id form.
 
 The `--real` path exercises `OpenAICompatProvider`: HTTP, 429/5xx backoff,
 `tool_calls` parsing, usage accounting. Same task, same loop, different
@@ -79,6 +121,7 @@ provider — that identity is the point of the exercise.
 | 03 | `e03_agent_loop.py` | Multi-step work costs context, not just steps |
 | 04 | `e04_failure_modes.py` | Bad args, unknown tool, stuck loop, budgets, crash — each with its own stop reason |
 | 05 | `e05_context_trim.py` | Trimming is lossy, so durable state must live outside the prompt |
+| 06 | `e06_hook.py` | Hook pattern stub — events around LLM calls and tool invocations |
 
 Run `python3 experiments/e04_failure_modes.py` first if you want the fastest
 overview: it prints the stop reason for six failure classes, which is most of
@@ -100,8 +143,8 @@ run can be replayed against the exact prompt the model saw.
 ## Verification
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 28 tests
-python3 -m compileall -q agent experiments tests
+uv run python -m unittest discover -s tests -t .   # 32 tests
+uv run python -m compileall -q agent experiments tests
 ```
 
 ## Commit convention
