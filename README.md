@@ -57,11 +57,14 @@ No install step, no virtualenv required: `experiments/*` put the repo root on
 ### Against a real model
 
 ```bash
-export DEEPSEEK_API_KEY=***        # or any OpenAI-compatible key
-export DEEPSEEK_BASE_URL=https://api.deepseek.com   # default
-export AGENT_MODEL=deepseek-chat                    # default
+export MODELSCOPE_API_KEY=***                       # ModelScope SDK token
+export MODELSCOPE_BASE_URL=https://api-inference.modelscope.cn/v1   # default
+export AGENT_MODEL=Qwen/Qwen3.8-Flash-Next                          # default
 python3 experiments/e02_tool_calling.py --real
 ```
+
+Get the token at `https://modelscope.cn/my/myaccesstoken`. Any model the endpoint
+serves works as long as it takes OpenAI-style `tools`; `Org/Model` is the id form.
 
 The `--real` path exercises `OpenAICompatProvider`: HTTP, 429/5xx backoff,
 `tool_calls` parsing, usage accounting. Same task, same loop, different

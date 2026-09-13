@@ -25,7 +25,7 @@ tools.py      provider.py        (execution | model access, independent of each 
 
 The provider is the only module that knows HTTP exists. The registry is the
 only one that knows how to run code. The loop knows neither, which is the point:
-a scripted provider and a live DeepSeek endpoint drive exactly the same loop,
+a scripted provider and a live ModelScope endpoint drive exactly the same loop,
 and swapping one for the other is a constructor argument in `experiments/_common.py`.
 
 ## Where the complexity actually went

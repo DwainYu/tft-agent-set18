@@ -4,7 +4,7 @@ Goal: see exactly what a chat-completions request is made of, and that a model
 call is stateless. The "conversation" is only a list we rebuild every time.
 
     python3 experiments/e01_single_turn.py            # scripted, deterministic
-    python3 experiments/e01_single_turn.py --real     # needs DEEPSEEK_API_KEY
+    python3 experiments/e01_single_turn.py --real     # needs MODELSCOPE_API_KEY
 """
 
 from __future__ import annotations

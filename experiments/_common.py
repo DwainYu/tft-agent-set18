@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:  # run these files directly, no install step
     sys.path.insert(0, str(ROOT))
 
 from agent.loop import AgentResult  # noqa: E402
-from agent.provider import Provider, ScriptedProvider, deepseek  # noqa: E402
+from agent.provider import Provider, ScriptedProvider, modelscope  # noqa: E402
 from agent.tools import ToolRegistry, default_tools  # noqa: E402
 
 
@@ -26,7 +26,7 @@ def registry() -> ToolRegistry:
 def pick_provider(argv: Sequence[str], script: Sequence[dict], real_task: str) -> Provider:
     """`--real` hits the API with the same task; the default is deterministic."""
     if "--real" in argv:
-        provider = deepseek()
+        provider = modelscope()
         print(f"[real] {provider.name} — task: {real_task!r}")
         return provider
     return ScriptedProvider(list(script))

@@ -4,7 +4,7 @@ Goal: make the loop do something no single call can — carry a fact through
 three tool calls and only then answer. Memory here is a tool, not a feature.
 
     python3 experiments/e03_agent_loop.py
-    DEEPSEEK_API_KEY=... python3 experiments/e03_agent_loop.py --real
+    MODELSCOPE_API_KEY=... python3 experiments/e03_agent_loop.py --real
 """
 
 from __future__ import annotations

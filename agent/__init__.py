@@ -10,7 +10,7 @@ from .provider import (
     ProviderError,
     ScriptedProvider,
     Usage,
-    deepseek,
+    modelscope,
 )
 from .tools import Tool, ToolError, ToolRegistry, calculator, default_tools
 from .trace import Trace
@@ -36,7 +36,7 @@ __all__ = [
     "assistant",
     "calculator",
     "default_tools",
-    "deepseek",
+    "modelscope",
     "estimate_tokens",
     "system",
     "trim",

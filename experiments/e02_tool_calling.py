@@ -5,7 +5,7 @@ anything; it emits a request, we execute it, and the result is fed back as the
 next prompt.
 
     python3 experiments/e02_tool_calling.py
-    DEEPSEEK_API_KEY=... python3 experiments/e02_tool_calling.py --real
+    MODELSCOPE_API_KEY=... python3 experiments/e02_tool_calling.py --real
 """
 
 from __future__ import annotations

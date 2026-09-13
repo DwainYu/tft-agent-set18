@@ -51,6 +51,12 @@ class Provider:
 
     name = "provider"
 
+    def __init__(self) -> None:
+        #: every message list this provider was handed, in call order. Observing
+        #: what actually went over the wire is half of what an experiment here is
+        #: for, so it belongs to the interface, not to one implementation.
+        self.calls: List[List[Dict[str, Any]]] = []
+
     def complete(self, messages: Sequence[Message], tools: Sequence[Dict[str, Any]]) -> Completion:
         raise NotImplementedError
 
@@ -65,10 +71,10 @@ class ScriptedProvider(Provider):
     name = "scripted"
 
     def __init__(self, script: List[Dict[str, Any]], latency_ms: int = 0) -> None:
+        super().__init__()
         self._script = script
         self._index = 0
         self._latency_ms = latency_ms
-        self.calls: List[List[Dict[str, Any]]] = []
 
     def complete(self, messages: Sequence[Message], tools: Sequence[Dict[str, Any]]) -> Completion:
         self.calls.append([message.to_dict() for message in messages])
@@ -94,7 +100,7 @@ class ScriptedProvider(Provider):
 
 
 class OpenAICompatProvider(Provider):
-    """Any OpenAI-compatible /chat/completions endpoint (DeepSeek, vLLM, ...)."""
+    """Any OpenAI-compatible /chat/completions endpoint (ModelScope API-Inference, vLLM, ...)."""
 
     def __init__(
         self,
@@ -104,16 +110,22 @@ class OpenAICompatProvider(Provider):
         timeout: float = 60.0,
         max_attempts: int = 3,
         temperature: float = 0.0,
+        extra_body: Optional[Dict[str, Any]] = None,
     ) -> None:
+        super().__init__()
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.name = f"{model}@{self.base_url}"
-        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
+        self.api_key = api_key or os.environ.get("MODELSCOPE_API_KEY", "")
         if not self.api_key:
-            raise ProviderError("no API key: set DEEPSEEK_API_KEY or drop --real")
+            raise ProviderError(
+                "no API key: export MODELSCOPE_API_KEY with your ModelScope SDK token "
+                "(https://modelscope.cn/my/myaccesstoken) or drop --real"
+            )
         self.timeout = timeout
         self.max_attempts = max_attempts
         self.temperature = temperature
+        self.extra_body = dict(extra_body or {})
         self.usage = Usage()
 
     def _request(self, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -143,39 +155,70 @@ class OpenAICompatProvider(Provider):
             time.sleep(0.5 * 2**attempt)  # exponential backoff
         raise ProviderError(f"giving up after {self.max_attempts} attempts: {last_error}")
 
+    @staticmethod
+    def _completion(data: Dict[str, Any]) -> Completion:
+        """把响应信封转为 Completion。
+
+        200 不等于可用回复：ModelScope 会对无法服务的模型返回 200 + `choices: null`，
+        此时必须报错，否则循环会把它当成"已完成但无内容"的答案。
+        """
+        choices = data.get("choices") or []
+        if not choices:
+            raise ProviderError(
+                f"{data.get('model')} returned no choices "
+                f"(usage={data.get('usage')!r})"
+            )
+        choice = choices[0]
+        message = Message.from_dict(choice.get("message") or {"role": "assistant"})
+        raw_usage = data.get("usage") or {}
+        usage = Usage(
+            int(raw_usage.get("prompt_tokens", 0)), int(raw_usage.get("completion_tokens", 0))
+        )
+        return Completion(message, usage, choice.get("finish_reason") or "stop", data)
+
     def complete(self, messages: Sequence[Message], tools: Sequence[Dict[str, Any]]) -> Completion:
         body: Dict[str, Any] = {
             "model": self.model,
             "messages": [message.to_dict() for message in messages],
             "temperature": self.temperature,
         }
+        body.update(self.extra_body)
         if tools:
             body["tools"] = list(tools)
             body["tool_choice"] = "auto"
+        self.calls.append([message.to_dict() for message in messages])
         data = self._request(body)
-        choice = (data.get("choices") or [{}])[0]
-        message = Message.from_dict(choice.get("message") or {"role": "assistant"})
-        raw_usage = data.get("usage") or {}
-        usage = Usage(
-            int(raw_usage.get("prompt_tokens", 0)), int(raw_usage.get("completion_tokens", 0))
-        )
-        self.usage.prompt_tokens += usage.prompt_tokens
-        self.usage.completion_tokens += usage.completion_tokens
-        return Completion(message, usage, choice.get("finish_reason") or "stop", data)
+        completion = self._completion(data)
+        self.usage.prompt_tokens += completion.usage.prompt_tokens
+        self.usage.completion_tokens += completion.usage.completion_tokens
+        return completion
 
 
-def deepseek(model: str = "deepseek-chat") -> OpenAICompatProvider:
+MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1"
+DEFAULT_MODEL = "Qwen/Qwen3.8-Flash-Next"
+
+
+def modelscope(model: str = DEFAULT_MODEL) -> OpenAICompatProvider:
+    """ModelScope API-Inference serves models as `Org/Model` over the OpenAI protocol.
+
+    `enable_thinking: False` keeps the usage numbers measuring the loop instead of
+    measuring a hidden reasoning channel; every model offered there accepts the flag.
+    """
     return OpenAICompatProvider(
-        base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        base_url=os.environ.get("MODELSCOPE_BASE_URL", MODELSCOPE_BASE_URL),
         model=model,
+        extra_body={
+            "enable_thinking": False,
+            "max_tokens": int(os.environ.get("AGENT_MAX_TOKENS", "1024")),
+        },
     )
 
 
 def build_provider(argv: Sequence[str]) -> Provider:
     """`--real` uses the API, otherwise the deterministic script."""
     if "--real" in argv:
-        return deepseek(os.environ.get("AGENT_MODEL", "deepseek-chat"))
+        return modelscope(os.environ.get("AGENT_MODEL", DEFAULT_MODEL))
     raise SystemExit(
-        "mock provider needs a script; pass --real with DEEPSEEK_API_KEY, "
+        "mock provider needs a script; pass --real with MODELSCOPE_API_KEY set, "
         "or call the experiment module from tests"
     )

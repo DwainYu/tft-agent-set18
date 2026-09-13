@@ -62,7 +62,7 @@ def main(argv: list) -> int:
     trimmed_events = [event for event in trace.events["events"] if event["kind"] == "context_trimmed"]
     print(f"trim events   : {len(trimmed_events)} of {result.turns} turns had to drop context")
 
-    first_request = provider.calls[0] if hasattr(provider, "calls") else []
+    first_request = provider.calls[0] if provider.calls else []
     print(f"request #1    : {len(first_request)} messages actually sent")
     print(f"first message : {first_request[0]['content'][:60] if first_request else 'n/a'}")
     print(
